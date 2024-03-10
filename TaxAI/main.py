@@ -11,6 +11,7 @@ from agents.BMFAC import BMFAC_agent
 from agents.MADDPG.MAAC import maddpg_agent as maddpg
 from agents.MADDPG_block.MAAC import maddpg_agent as maddpg_block
 from agents.MADDPG_attention.MAAC import maddpg_agent as maddpg_attention
+from agents.MADDPG_attention2.MAAC import maddpg_agent as maddpg_attention2
 from utils.seeds import set_seeds
 from arguments import get_args
 import os
@@ -98,6 +99,8 @@ if __name__ == '__main__':
         trainer = maddpg_block(env, yaml_cfg.Trainer)
     elif args.alg == "maddpga":     # add attention layer
         trainer = maddpg_attention(env, yaml_cfg.Trainer)
+    elif args.alg == "maddpga2":
+        trainer = maddpg_attention2(env, yaml_cfg.Trainer)
     else:
         # undo agent
         trainer = calibration_agent(env, yaml_cfg.Trainer)

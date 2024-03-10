@@ -461,9 +461,16 @@ class mlp_net(nn.Module):
         x_a = torch.tanh(self.fc1_a(x))
         x_a = torch.tanh(self.fc2_a(x_a))
 
+        # mean = self.action_mean(x_a)
+        # sigma_log = self.sigma_log.expand_as(mean)
+        # sigma = torch.exp(sigma_log)
+        # pi = (mean, sigma)
+        
         mean = self.action_mean(x_a)
-        sigma_log = self.sigma_log.expand_as(mean)
-        sigma = torch.exp(sigma_log)
+        sigma_log = self.sigma_log
+        if mean.dim() > sigma_log.dim():
+            sigma_log = sigma_log.expand_as(mean)
+        sigma = torch.exp(self.sigma_log)
         pi = (mean, sigma)
 
         return state_value, pi
@@ -541,6 +548,46 @@ class BMF_actor(nn.Module):
 #         log_std = torch.clamp(log_std, min=self.log_std_min, max=self.log_std_max)
 #
 #         return (mean, torch.exp(log_std))
+
+
+class BMF_actor_2(nn.Module):
+    def __init__(self, input_size, gov_action_dim, house_action_dim, num_agent, log_std_min, log_std_max):
+        super(BMF_actor_2, self).__init__()
+        self.fc1 = nn.Linear(input_size + gov_action_dim, 128)
+
+        # self.gru = nn.GRU(128, 256, 1, batch_first=True)
+        self.fc2 = nn.Linear(128, 128)
+        # self.ln2 = nn.LayerNorm(128)
+        self.tanh = nn.Tanh()
+        self.mean = nn.Linear(128, house_action_dim)
+        self.log_std = nn.Linear(128, house_action_dim)
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+        self.num_agent = num_agent
+        # self.apply(weight_init)
+    #     self.initialize_weights()
+    #
+    # def initialize_weights(self):
+    #     for m in self.modules():
+    #         if isinstance(m, nn.Linear):
+    #             nn.init.xavier_uniform_(m.weight)
+    #             nn.init.constant_(m.bias, 0.0)
+
+    def forward(self, global_state, private_state, gov_action, update=False):
+        inputs = torch.cat([global_state, private_state, gov_action], dim=-1)
+        out = F.softplus(self.fc1(inputs))
+        # out, _ = self.gru(out)
+        # out = out.squeeze(1)
+        out = F.softplus(self.fc2(out))
+        out = F.softplus(out)
+        mean = self.mean(out)
+        log_std = self.log_std(out)
+        log_std = torch.clamp(log_std, min=self.log_std_min, max=self.log_std_max)
+        mean = torch.clamp(mean, min=-1, max=1)
+
+        return (mean, torch.exp(log_std))
+
+
 class BMF_actor_1(nn.Module):
     def __init__(self, input_size, gov_action_dim, house_action_dim, num_agent, log_std_min, log_std_max):
         super(BMF_actor_1, self).__init__()
@@ -571,6 +618,7 @@ class BMF_actor_1(nn.Module):
 
         n_global_obs = global_state.repeat(1, self.num_agent, 1)
         n_gov_action = gov_action.repeat(1, self.num_agent, 1)
+        
         inputs = torch.cat([n_global_obs, private_state, n_gov_action], dim=-1)
         out = F.softplus(self.fc1(inputs))
         # out, _ = self.gru(out)

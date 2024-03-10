@@ -18,5 +18,15 @@
     "is_act_continuous": true,
     "agent_nums": [1,1,1,1],
     "obs_type": ["dict", "dict", "dict", "dict"]
+    },
+  "hos10": {
+    "class_literal": "Hos10",
+    "n_player": 10,
+    "max_step": 500,
+    "game_name": "Hos10",
+    "is_obs_continuous": true,
+    "is_act_continuous": true,
+    "agent_nums": [1,1,1,1,1, 1,1,1,1,1],
+    "obs_type": ["dict", "dict", "dict", "dict", "dict", "dict", "dict", "dict", "dict", "dict"]
     }
 }

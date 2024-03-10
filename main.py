@@ -1,4 +1,9 @@
 # -*- coding:utf-8  -*-
+
+import warnings
+warnings.filterwarnings("ignore")
+
+
 import os
 import time
 import json
@@ -11,7 +16,6 @@ sys.path.append("./olympics_engine")
 from env.chooseenv import make
 from utils.get_logger import get_logger
 from env.obs_interfaces.observation import obs_type
-
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -66,6 +70,7 @@ def get_joint_action_eval(game, multi_part_agent_ids, policy_list, actions_space
             agent_id = agents_id_list[i]
             a_obs = all_observes[agent_id]
             each = eval(function_name)(a_obs, action_space_list[i], game.is_act_continuous)
+            # print(each)
             joint_action.append(each)
     # print(joint_action)
     return joint_action
@@ -101,7 +106,7 @@ def run_game(g, env_name, multi_part_agent_ids, actions_spaces, policy_list, ren
         function_name = 'm%d' % i
         import_name = "my_controller"
         import_s = "from %s import %s as %s" % (import_path, import_name, function_name)
-        print("excute", import_s)
+        # print("excute", import_s)
         exec(import_s, globals())
 
     st = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
@@ -119,8 +124,8 @@ def run_game(g, env_name, multi_part_agent_ids, actions_spaces, policy_list, ren
     all_observes = g.all_observes
     while not g.is_terminal():
         step = "step%d" % g.step_cnt
-        if g.step_cnt % 10 == 0:
-            print(step)
+        # if g.step_cnt % 10 == 0:
+        #     print(step)
 
         if render_mode and hasattr(g, "env_core"):
             if hasattr(g.env_core, "render"):
@@ -158,28 +163,25 @@ def get_valid_agents():
 
 
 if __name__ == "__main__":
-
-    env_type = "taxing_household"   #"taxing_household" "taxing_gov"
-    # env_type = "taxing_gov"   #"taxing_household" "taxing_gov"
-    # env_type = "olympics"   #"taxing_household" "taxing_gov"
-    game = make(env_type, seed=None)
-
-    render_mode = False
-
+    policy_list = [ 
+                    "random", "random",
+                    "ippo_hos", "ippo2_hos",
+                    "bmfac_hos", "bmfac2_hos", 
+                    "maddpg_hos", "maddpg2_hos", 
+                    # "maddpgb_hos", "maddpgb2_hos",
+                    "maddpgbb_hos", "maddpgbb2_hos",
+                   ]
+    govs = ["bmfac_gov", "bmfac2_gov", "ippo_gov", "ippo2_gov", 
+            "maddpg_gov", "maddpg2_gov", "maddpgb_gov", "maddpgb2_gov"]
     parser = argparse.ArgumentParser()
-    # python run_log.py --my_ai h --opponent1 h --opponent2 h --opponent3 h128
-    # python run_log.py --my_ai h --opponent1 h0 --opponent2 h1 --opponent3 h2
-    # python run_log.py --my_ai h128 --opponent1 h --opponent2 h --opponent3 h
-    parser.add_argument("--my_ai", default="random", help="random")
-    parser.add_argument("--opponent1", default="random", help="random")
-    parser.add_argument("--opponent2", default="random", help="random")
-    parser.add_argument("--opponent3", default="random", help="random")
-
+    parser.add_argument('--gov', default="ippo_gov", type=str, help=govs)
     args = parser.parse_args()
-    _policy_list = [args.my_ai, args.opponent1, args.opponent2, args.opponent3]
-    policy_list = _policy_list[:len(game.agent_nums)]
-    # print(policy_list)
-    # exit()
-    multi_part_agent_ids, actions_space = get_players_and_action_space_list(game)
 
+    # env_type = "taxing_household"   #"taxing_household" "taxing_gov"
+    # env_type = "taxing_gov"   #"taxing_household" "taxing_gov"
+    env_type = "hos10"   #"taxing_household" "taxing_gov"
+    game = make(env_type, seed=None)
+    render_mode = False
+    game.set_gov(args.gov)
+    multi_part_agent_ids, actions_space = get_players_and_action_space_list(game)
     run_game(game, env_type, multi_part_agent_ids, actions_space, policy_list, render_mode)

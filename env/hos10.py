@@ -2,6 +2,8 @@ import random
 import os
 import sys
 from pathlib import Path
+
+from agents.random import random_agent
 CURRENT_PATH = str(Path(__file__).resolve().parent.parent.parent)
 taxing_path = os.path.join(CURRENT_PATH)
 sys.path.append(taxing_path)
@@ -15,7 +17,13 @@ from omegaconf import OmegaConf
 from utils.box import Box
 from env.simulators.game import Game
 
-__all__ = ['Taxing_Household']
+__all__ = ['Hos10']
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 
 class RandomAgent:
     def __init__(self, action_space):
@@ -24,105 +32,16 @@ class RandomAgent:
     def __call__(self, observation):
         return [self.action_space[0].sample()]
 
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-
-class Actor(nn.Module):
-    def __init__(self, input_size, output_size, hidden_size=128):
-        super(Actor, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, hidden_size)
-        self.action_out = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        x = F.softplus(self.fc1(x))
-        x = F.softplus(self.fc2(x))
-        x = F.softplus(self.fc3(x))
-        actions = torch.tanh(self.action_out(x))
-        return actions
-    
-    def sample(self, state, num_actions=4):
-        if not isinstance(state, torch.Tensor):
-            state = torch.tensor(state, dtype=torch.float32)
-            if self.action_out.weight.is_cuda:
-                state = state.cuda()
-        state = state.unsqueeze(0)
-        actions = []
-        with torch.no_grad():
-            action = self.forward(state)
-            for _ in range(num_actions):
-                actions.append(action.squeeze(0).cpu().numpy())
-        return np.array(actions)
-    
-class Critic(nn.Module):
-    def __init__(self, input_size, hidden_size=128):
-        super(Critic, self).__init__()
-
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        # self.ln1 = nn.LayerNorm(hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        # self.ln2 = nn.LayerNorm(hidden_size)
-        self.fc3 = nn.Linear(hidden_size, hidden_size)
-        # self.ln3 = nn.LayerNorm(hidden_size)
-        self.q_out = nn.Linear(hidden_size, 1)
-        # self.apply(weight_init)
-
-        # self.initialize_weights()
-    def initialize_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                nn.init.constant_(m.bias, 0.0)
-
-    def forward(self, state, action):
-        x = torch.cat([state, action], dim=1)
-        # x = F.softplus(self.ln1(self.fc1(x)))
-        # x = F.softplus(self.ln2(self.fc2(x)))
-        # x = F.softplus(self.ln3(self.fc3(x)))
-        x = F.softplus(self.fc1(x))
-        x = F.softplus(self.fc2(x))
-        x = F.softplus(self.fc3(x))
-        q_value = self.q_out(x)
-        return q_value
-
-param_dict = torch.load("/root/Competition_TaxingAI/TaxAI/agents/models/maddpg/10/run1/agent_10.pt", map_location=torch.device('cpu'))
-input_size = param_dict["fc1.weight"].size()[1]
-output_size = param_dict["action_out.weight"].size()[0]
-hidden_size = param_dict["fc1.weight"].size()[0]
-gov_actor = Actor(input_size, output_size, hidden_size)
-gov_actor.load_state_dict(param_dict)
-gov_actor.eval()  # 设置网络为评估模式
-
-class GovAgent:
-    def __init__(self, action_space):
-        self.action_space = action_space
-        self.agent_name = 'Random'
-    def __call__(self, observation):
-        global gov_actor
-        
-        raw_obs = observation['obs']['raw_obs']
-        if self.action_space[0].shape==(4,2):
-            raw_obs = np.concatenate(raw_obs, axis=-1)
-            action = gov_actor.sample(raw_obs, num_actions=4)
-            return [np.array(action)]
-        else:
-            action = gov_actor.sample(raw_obs, num_actions=1)
-            return np.array(action)
-
-class Taxing_Household(Game):
+class Hos10(Game):
     def __init__(self, conf, seed=None):
-        super(Taxing_Household, self).__init__(conf['n_player'], conf['is_obs_continuous'], conf['is_act_continuous'],
+        super(Hos10, self).__init__(conf['n_player'], conf['is_obs_continuous'], conf['is_act_continuous'],
                                                conf['game_name'], conf['agent_nums'], conf['obs_type'])
         self.seed = seed
         self.set_seed()
 
         # yaml_path = os.path.join(CURRENT_PATH, '/root/Competition_TaxingAI/TaxAI/cfg/n4.yaml')
         # yaml_cfg = OmegaConf.load(yaml_path)
-        yaml_cfg = OmegaConf.load("/root/Competition_TaxingAI/TaxAI/cfg/n4.yaml")
+        yaml_cfg = OmegaConf.load("/root/Competition_TaxingAI/TaxAI/cfg/cc.yaml")
         self.env_core = economic_society(yaml_cfg.Environment)
         self.max_step = int(conf['max_step'])       #TODO: check max step in the env_core
 
@@ -139,12 +58,18 @@ class Taxing_Household(Game):
         self.total_r = 0
         self.gov_reward = 0
 
-        # self.sub_controller = [RandomAgent([self.each_gov_spaces])]
-        self.sub_controller = [GovAgent([self.each_gov_spaces])]
+        self.sub_controller = [RandomAgent([self.each_gov_spaces])]
+        # self.sub_controller = [GovAgent([self.each_gov_spaces])]
 
         self.reset()
         self.init_info = {'Controllable': self.controllable_agent_id,
                           'Opponent': [i.agent_name for i in self.sub_controller]}
+    
+    def set_gov(self, name):
+        self.gov_name = name
+        module_name = f"agents.{name}"
+        module = importlib.import_module(module_name)
+        self.sub_controller = [module.my_controller]
 
     @staticmethod
     def create_seed():

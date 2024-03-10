@@ -2,6 +2,7 @@
 # Time  : 2021/5/31 下午4:14
 # Author: Yahui Cui
 
+
 """
 # =================================== Important =========================================
 Notes:
@@ -11,6 +12,9 @@ https://github.com/jidiai/ai_lib/blob/master/examples/demo
 """
 
 
+__all__ = ["my_controller"]
+
+
 def my_controller(observation, action_space, is_act_continuous=False):
     # print("observation", observation)
     agent_action = []
@@ -18,9 +22,7 @@ def my_controller(observation, action_space, is_act_continuous=False):
         action_ = sample_single_dim(action_space[i], is_act_continuous)
         agent_action.append(action_)
     # print("agent_action", agent_action)
-    # print("random_action", agent_action)
-    # print("random action", agent_action)
-#     raise Exception(observation, agent_action)
+    # print(action_space)
     return agent_action
 
 
